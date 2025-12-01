@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Интерактивная карта Австралии</title>
+    <style>
+        /* СБРОС */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        /* ОСНОВНОЙ ФОН */
+        body {
+            background: #1a1a1a;
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        /* КНОПКА ДОМОЙ */
+        .home-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #444;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            z-index: 1001;
+            font-weight: bold;
+            transition: 0.3s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        .home-btn:hover {
+            background: #666;
+        }
+        
+        /* МОДАЛКА ПЕРЕХОДА */
+        .home-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1002;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .modal-content {
+            background: #2a2a2a;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+            border: 1px solid #555;
+        }
+        .modal-buttons {
+            margin-top: 25px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        .modal-btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .modal-btn.yes {
+            background: #4CAF50;
+            color: white;
+        }
+        .modal-btn.no {
+            background: #f44336;
+            color: white;
+        }
+        .modal-btn:hover {
+            opacity: 0.9;
+            transform: scale(1.05);
+        }
+        
+        /* КОНТЕЙНЕР КАРТЫ */
+        .map-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+        #australia-map {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 10px;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.7);
+        }
+        
+        /* ТОЧКИ НА КАРТЕ */
+        .point {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: #ff3838;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            border: 3px solid #fff;
+            box-shadow: 0 0 15px rgba(255, 56, 56, 0.8);
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+        .point:hover {
+            background: #ffaf40;
+            transform: translate(-50%, -50%) scale(1.3);
+        }
+        .point::after {
+            content: attr(data-name);
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 6px 15px;
+            border-radius: 12px;
+            font-size: 15px;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            border: 1px solid #444;
+        }
+        .point:hover::after {
+            opacity: 1;
+        }
+        
+        /* ОКНО ИНФОРМАЦИИ */
+        .info-window {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 95%;
+            max-width: 900px;
+            max-height: 90vh;
+            background: #252525;
+            border-radius: 20px;
+            padding: 25px;
+            z-index: 1000;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8);
+            border: 1px solid #444;
+            overflow-y: auto;
+            animation: fadeIn 0.4s;
+        }
+        .info-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #444;
+        }
+        .info-title {
+            font-size: 2rem;
+            color: #ffaf40;
+            font-weight: 800;
+        }
+        .close-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .close-btn:hover {
+            background: #ff6b6b;
+        }
+        
+        /* НОВАЯ ГАЛЕРЕЯ */
+        .gallery-container {
+            margin: 25px 0;
+        }
+        .main-media {
+            position: relative;
+            width: 100%;
+            max-height: 400px;
+            margin-bottom: 20px;
+            border-radius: 15px;
+            overflow: hidden;
+            background: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #mainPhoto {
+            max-width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            border-radius: 10px;
+        }
+        .arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 10;
+            transition: 0.3s;
+        }
+        .arrow:hover {
+            background: rgba(255, 175, 64, 0.9);
+        }
+        .arrow-left {
+            left: 15px;
+        }
+        .arrow-right {
+            right: 15px;
+        }
+        
+        /* 4 КВАДРАТА */
+        .thumbnails {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .thumbnail {
+            aspect-ratio: 1;
+            border-radius: 10px;
+            background: #333;
+            overflow: hidden;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #aaa;
+            font-size: 14px;
+        }
+        .thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .thumbnail:hover {
+            border-color: #666;
+        }
+        .thumbnail.active {
+            border-color: #ffaf40;
+        }
+        .thumbnail.video {
+            background: #1a1a1a;
+            border: 2px dashed #555;
+            flex-direction: column;
+        }
+        .video-icon {
+            font-size: 30px;
+            margin-bottom: 5px;
+        }
+        
+        /* ОПИСАНИЕ (100+ СЛОВ) */
+        .info-description {
+            line-height: 1.7;
+            font-size: 1.1rem;
+            color: #ddd;
+            margin-top: 25px;
+            text-align: justify;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            border-left: 4px solid #ffaf40;
+        }
+        
+        /* ВЕРСИЯ ВНИЗУ */
+        .version {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #aaa;
+        }
+        
+        /* UPD LOG */
+        .upd-log {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            animation: fadeIn 0.5s;
+        }
+        .upd-content {
+            background: #252525;
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 500px;
+            width: 90%;
+            border: 2px solid #ffaf40;
+        }
+        .upd-content h3 {
+            color: #ffaf40;
+            margin-bottom: 15px;
+        }
+        .upd-content ul {
+            margin-left: 20px;
+            margin-bottom: 20px;
+        }
+        .upd-content li {
+            margin-bottom: 8px;
+            color: #ccc;
+        }
+        
+        /* АДАПТИВ */
+        @media (max-width: 768px) {
+            .point {
+                width: 18px;
+                height: 18px;
+                border-width: 2px;
+            }
+            .info-window {
+                padding: 20px;
+            }
+            .info-title {
+                font-size: 1.6rem;
+            }
+            .thumbnails {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .main-media {
+                max-height: 300px;
+            }
+            .arrow {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+            .info-description {
+                font-size: 1rem;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- КНОПКА ДОМОЙ -->
+    <button class="home-btn" onclick="openHomeModal()">🏠 Домой</button>
+
+    <!-- МОДАЛКА ПЕРЕХОДА -->
+    <div class="home-modal" id="homeModal">
+        <div class="modal-content">
+            <h2>Переход на главный сайт</h2>
+            <p>Вы уверены, что хотите перейти на главную страницу проекта?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn yes" onclick="goToMainSite()">Да, перейти</button>
+                <button class="modal-btn no" onclick="closeHomeModal()">Нет, остаться</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- UPD LOG -->
+    <div class="upd-log" id="updLog">
+        <div class="upd-content">
+            <h3>Обновление v0.2 — Что нового:</h3>
+            <ul>
+                <li>Адаптив для телефонов и ПК</li>
+                <li>Кнопка "Домой" в правом углу</li>
+                <li>Карта на весь экран</li>
+                <li>Новая галерея: 1 фото + стрелки + 4 квадрата</li>
+                <li>Поддержка видео (квадрат 4)</li>
+                <li>Серый фон вместо синего</li>
+                <li>Полные описания 100+ слов</li>
+                <li>Исправлены координаты точек</li>
+            </ul>
+            <p style="color: #ffaf40; text-align: center; margin-top: 20px;">Нажмите в любом месте, чтобы продолжить</p>
+        </div>
+    </div>
+
+    <!-- КАРТА -->
+    <div class="map-container">
+        <img id="australia-map" src="australia.png" alt="Карта Австралии" onload="initMap()">
+    </div>
+
+    <!-- ОКНО ИНФОРМАЦИИ -->
+    <div class="info-window" id="infoWindow">
+        <div class="info-header">
+            <h2 class="info-title" id="infoTitle">Западная Австралия</h2>
+            <button class="close-btn" onclick="closeInfo()">×</button>
+        </div>
+        
+        <!-- ГАЛЕРЕЯ -->
+        <div class="gallery-container">
+            <div class="main-media">
+                <img id="mainPhoto" src="" alt="Основное фото">
+                <button class="arrow arrow-left" onclick="prevMedia()">←</button>
+                <button class="arrow arrow-right" onclick="nextMedia()">→</button>
+            </div>
+            
+            <div class="thumbnails" id="thumbnails"></div>
+        </div>
+        
+        <!-- ОПИСАНИЕ (100+ СЛОВ) -->
+        <div class="info-description" id="infoDescription"></div>
+    </div>
+
+    <!-- ВЕРСИЯ -->
+    <div class="version">v0.2</div>
+
+    <script>
+        // ========== ДАННЫЕ ТОЧЕК ==========
+        const pointsData = [
+            {
+                id: 1,
+                name: "Западная Австралия",
+                x: 250, y: 550,
+                description: "Западная Австралия — крупнейший штат страны, занимающий треть всего континента. Его ландшафты варьируются от красных пустынь Пиннаклс до бирюзовых вод Индийского океана. Столица штата, Перт, считается одним из самых изолированных мегаполисов мира, окружённый парками Кингс-парк и виноградниками долины Маргарет-Ривер. Штат славится уникальными природными памятниками: волнообразная скала Уэйв-Рок, древние окаменелости Шарк-Бей, внесённые в список ЮНЕСКО, и светящиеся озёра. Экономика региона основана на добыче полезных ископаемых — здесь добывают золото, железную руду и алмазы. Климат варьируется от средиземноморского на юго-западе до засушливого в глубине континента. Штат также известен богатой аборигенской культурой и фестивалями под открытым небом.",
+                media: [
+                    { type: 'image', src: 'photos/WA_1.png' },
+                    { type: 'image', src: 'photos/WA_2.png' },
+                    { type: 'image', src: 'photos/WA_3.png' },
+                    { type: 'video', src: '', label: 'Видео пока нет' }
+                ]
+            },
+            {
+                id: 2,
+                name: "Северная территория",
+                x: 600, y: 400,
+                description: "Северная Территория — регион древних аборигенских культур и дикой природы. Его сердцем является Улуру (Айерс-Рок), священный монолит, меняющий цвет на восходе и закате солнца. Национальный парк Какаду, объект Всемирного наследия ЮНЕСКО, хранит наскальные рисунки возрастом 20 000 лет и является домом для крокодилов, валлаби и сотен видов птиц. Столица территории, Дарвин, — тропический город, служащий воротами в Азию. Регион знаменит своими национальными парками: Личфилд с водопадами, Западно-Макдоннеллские хребты с ущельями. Климат разделён на сухой сезон и сезон дождей, когда природа оживает. Северная Территория предлагает уникальный опыт: от наблюдения за звёздами в пустыне до знакомства с культурой аборигенов.",
+                media: [
+                    { type: 'image', src: 'photos/NT_1.png' },
+                    { type: 'image', src: 'photos/NT_2.png' },
+                    { type: 'image', src: 'photos/NT_3.png' },
+                    { type: 'video', src: '', label: 'Видео пока нет' }
+                ]
+            },
+            {
+                id: 3,
+                name: "Южная Австралия",
+                x: 650, y: 630,
+                description: "Южная Австралия — штат, известный своими винодельнями, фестивалями и уникальной фауной. Столица, Аделаида, прозвана «городом церквей» за свою архитектуру и отличается упорядоченной планировкой. Долина Баросса — один из старейших винодельческих регионов страны, где производятся вина мирового класса. Остров Кенгуру — заповедник с коалами, пингвинами, морскими львами и эндемичными видами. Пустыня Симпсон с её красными дюнами контрастирует с плодородными долинами реки Муррей. Штат лидирует в использовании возобновляемой энергии, особенно солнечной. Культурная жизнь насыщена событиями: Аделаидский фестиваль искусств, Фриндж и гонка «Формула-1». Южная Австралия также славится местными продуктами: оливковым маслом, сырами и морепродуктами.",
+                media: [
+                    { type: 'image', src: 'photos/SA_1.png' },
+                    { type: 'image', src: 'photos/SA_2.png' },
+                    { type: 'image', src: 'photos/SA_3.png' },
+                    { type: 'video', src: '', label: 'Видео пока нет' }
+                ]
+            },
+            {
+                id: 4,
+                name: "Новый Южный Уэльс",
+                x: 1000, y: 600,
+                description: "Новый Южный Уэльс — самый густонаселённый штат, где находится Сидней, экономическое и культурное сердце страны. Знаменитый Оперный театр и мост Харбор-Бридж являются символами не только города, но и всей Австралии. Пляжи Бонди и Мэнли привлекают сёрферов со всего мира. Голубые горы с эвкалиптовыми лесами и ущельями предлагают потрясающие виды и пешие маршруты. Виноградники долины Хантер производят одни из лучших вин страны. Штат также включает столицу страны Канберру (Австралийскую столичную территорию). Новый Южный Уэльс предлагает всё: от альпийских курортов Снежных гор до диких национальных парков. Экономика разнообразна: финансы, туризм, сельское хозяйство и IT. Культурная сцена включает театры, галереи и ежегодные события вроде Сиднейского фестиваля.",
+                media: [
+                    { type: 'image', src: 'photos/NSW_1.png' },
+                    { type: 'image', src: 'photos/NSW_2.png' },
+                    { type: 'image', src: 'photos/NSW_3.png' },
+                    { type: 'video', src: '', label: 'Видео пока нет' }
+                ]
+            },
+            {
+                id: 5,
+                name: "Квинсленд",
+                x: 880, y: 440,
+                description: "Квинсленд — солнечный штат с тропическим климатом, известный как «штат солнечного сияния». Большой Барьерный риф — крупнейшая коралловая система планеты, видимая из космоса, предлагает дайвинг и сноркелинг. Тропические леса Дейнтри — одни из древнейших на Земле, включены в список ЮНЕСКО. Брисбен, столица штата, — динамичный город на реке с субтропическим климатом. Золотое Побережье с небоскрёбами и парками развлечений привлекает миллионы туристов. Здесь можно плавать с китовыми акулами на Нингалу, исследовать острова Уитсанди и наблюдать за утконосами в чистых реках. Квинсленд также является домом для многих эндемичных видов, включая коал и кенгуру. Штат предлагает разнообразные активности: от экотуризма до экстремальных видов спорта. Экономика основана на туризме, сельском хозяйстве и добыче полезных ископаемых.",
+                media: [
+                    { type: 'image', src: 'photos/QLD_1.png' },
+                    { type: 'image', src: 'photos/QLD_2.png' },
+                    { type: 'image', src: 'photos/QLD_3.png' },
+                    { type: 'video', src: '', label: 'Видео пока нет' }
+                ]
+            },
+            {
+                id: 6,
+                name: "Виктория",
+                x: 810, y: 740,  // Сдвинуто: +115px вправо, +75px вниз
+                description: "Виктория — самый маленький материковый штат, но с огромной культурной жизнью. Мельбурн, столица штата, регулярно признаётся одним из самых удобных для жизни городов мира. Это центр искусства, спорта и кулинарии, известный своими граффити-аллеями, кофейной культурой и разнообразной кухней. Великая океанская дорога ведёт к Двенадцати апостолам — известняковым колоннам, возвышающимся над Южным океаном. Здесь находятся золотые прииски Балларата, рассказывающие о золотой лихорадке 1850-х годов. Альпийские курорты, такие как Маунт-Буллер, предлагают зимние виды спорта. Винодельни долины Ярра производят одни из лучших австралийских вин. Виктория также известна своей дикой природой: коалы на острове Филлип, пингвины и тюлени. Штат активно развивает sustainable tourism и экологические инициативы.",
+                media: [
+                    { type: 'image', src: 'photos/VIC_1.png' },
+                    { type: 'image', src: 'photos/VIC_2.png' },
+                    { type: 'image', src: 'photos/VIC_3.png' },
+                    { type: 'video', src: '', label: 'Видео пока нет' }
+                ]
+            },
+            {
+                id: 7,
+                name: "Столичная территория",
+                x: 1000, y: 718,  // Сдвинуто: +115px вправо, +75px вниз
+                description: "Австралийская столичная территория — специально созданный регион для столицы страны, Канберры. Город был спроектирован американским архитектором Уолтером Бёрли Гриффином как «город-сад» с радиальной планировкой. Здесь находятся ключевые правительственные учреждения: Парламент (Старый и Новый), Австралийский военный мемориал, Верховный суд. Озеро Берли‑Гриффин в центре города идеально для прогулок, водного спорта и пикников. Национальные институты включают Национальную галерею, Национальный музей и Национальную библиотеку. Канберра окружена природными парками: гора Эйнсли, заповедник Тидбинбилла. Город известен своими фестивалями: Флориада (фестиваль цветов), Enlighten (световые инсталляции). Это также образовательный центр с университетами и исследовательскими институтами. Канберра сочетает политическую значимость с качеством жизни в зелёном окружении.",
+                media: [
+                    { type: 'image', src: 'photos/ACT_1.png' },
+                    { type: 'image', src: 'photos/ACT_2.png' },
+                    { type: 'image', src: 'photos/ACT_3.png' },
+                    { type: 'video', src: '', label: 'Видео пока нет' }
+                ]
+            }
+        ];
+
+        // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
+        const mapImg = document.getElementById('australia-map');
+        const infoWindow = document.getElementById('infoWindow');
+        const infoTitle = document.getElementById('infoTitle');
+        const infoDescription = document.getElementById('infoDescription');
+        const mainPhoto = document.getElementById('mainPhoto');
+        const thumbnailsContainer = document.getElementById('thumbnails');
+        
+        let currentPoint = null;
+        let currentMediaIndex = 0;
+
+        // ========== UPD LOG ==========
+        if (!sessionStorage.getItem('updSeen_v0.2')) {
+            document.getElementById('updLog').style.display = 'flex';
+            sessionStorage.setItem('updSeen_v0.2', 'true');
+        }
+        document.getElementById('updLog').addEventListener('click', function() {
+            this.style.display = 'none';
+        });
+
+        // ========== ИНИЦИАЛИЗАЦИЯ КАРТЫ ==========
+        function initMap() {
+            const container = document.querySelector('.map-container');
+            container.innerHTML = '';
+            
+            const img = document.createElement('img');
+            img.id = 'australia-map';
+            img.src = 'australia.png';
+            img.alt = 'Карта Австралии';
+            img.style.maxWidth = '100%';
+            img.style.maxHeight = '100%';
+            img.style.objectFit = 'contain';
+            container.appendChild(img);
+            
+            img.onload = function() {
+                const imgWidth = img.offsetWidth;
+                const imgHeight = img.offsetHeight;
+                const imgOffsetX = (container.offsetWidth - imgWidth) / 2;
+                const imgOffsetY = (container.offsetHeight - imgHeight) / 2;
+                
+                pointsData.forEach(point => {
+                    const pointEl = document.createElement('div');
+                    pointEl.className = 'point';
+                    pointEl.setAttribute('data-name', point.name);
+                    
+                    const x = imgOffsetX + (point.x / 1275) * imgWidth;
+                    const y = imgOffsetY + (point.y / 999) * imgHeight;
+                    
+                    pointEl.style.left = x + 'px';
+                    pointEl.style.top = y + 'px';
+                    
+                    pointEl.addEventListener('click', () => openInfo(point));
+                    container.appendChild(pointEl);
+                });
+            };
+            
+            if (img.complete) img.onload();
+        }
+
+        // ========== ОТКРЫТИЕ ИНФОРМАЦИИ ==========
+        function openInfo(point) {
+            currentPoint = point;
+            currentMediaIndex = 0;
+            
+            infoTitle.textContent = point.name;
+            infoDescription.textContent = point.description;
+            updateGallery();
+            infoWindow.style.display = 'block';
+        }
+
+        function closeInfo() {
+            infoWindow.style.display = 'none';
+        }
+
+        // ========== ГАЛЕРЕЯ ==========
+        function updateGallery() {
+            if (!currentPoint) return;
+            
+            const media = currentPoint.media;
+            
+            if (media.length > 0) {
+                if (media[currentMediaIndex].type === 'image') {
+                    mainPhoto.src = media[currentMediaIndex].src;
+                    mainPhoto.style.display = 'block';
+                } else {
+                    mainPhoto.style.display = 'none';
+                }
+            }
+            
+            thumbnailsContainer.innerHTML = '';
+            media.forEach((item, index) => {
+                const thumb = document.createElement('div');
+                thumb.className = `thumbnail ${index === currentMediaIndex ? 'active' : ''} ${item.type === 'video' ? 'video' : ''}`;
+                thumb.onclick = () => selectMedia(index);
+                
+                if (item.type === 'image') {
+                    const img = document.createElement('img');
+                    img.src = item.src;
+                    img.alt = `Фото ${index + 1}`;
+                    thumb.appendChild(img);
+                } else {
+                    thumb.innerHTML = `<div class="video-icon">🎬</div><div>${item.label || 'Видео'}</div>`;
+                }
+                
+                thumbnailsContainer.appendChild(thumb);
+            });
+        }
+
+        function selectMedia(index) {
+            currentMediaIndex = index;
+            updateGallery();
+        }
+
+        function prevMedia() {
+            if (!currentPoint) return;
+            currentMediaIndex = (currentMediaIndex - 1 + currentPoint.media.length) % currentPoint.media.length;
+            updateGallery();
+        }
+
+        function nextMedia() {
+            if (!currentPoint) return;
+            currentMediaIndex = (currentMediaIndex + 1) % currentPoint.media.length;
+            updateGallery();
+        }
+
+        // ========== КНОПКА ДОМОЙ ==========
+        function openHomeModal() {
+            document.getElementById('homeModal').style.display = 'flex';
+        }
+        function closeHomeModal() {
+            document.getElementById('homeModal').style.display = 'none';
+        }
+        function goToMainSite() {
+            window.location.href = 'https://your-main-site.github.io';
+        }
+
+        // ========== ЗАКРЫТИЕ ОКОН ==========
+        window.addEventListener('click', (event) => {
+            if (event.target === infoWindow) closeInfo();
+            if (event.target === document.getElementById('homeModal')) closeHomeModal();
+        });
+
+        // ========== ЗАПУСК ==========
+        window.addEventListener('load', initMap);
+    </script>
+</body>
+</html>
